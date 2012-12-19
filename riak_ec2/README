@@ -1,0 +1,7 @@
+config file structure:
+<host_param> <RSA key file> <script for execution on remote host>
+...
+<host_param> <RSA key file> <script for execution on remote host>
+
+where <host_param> ::= <name>@<ip>
+
