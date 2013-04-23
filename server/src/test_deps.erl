@@ -5,7 +5,7 @@
 %%      loading path, and locate resources relative
 %%      to this application's path.
 
--module(greeting_deps).
+-module(test_deps).
 -author("Mochi Media <dev@mochimedia.com>").
 
 -export([ensure/0, ensure/1]).

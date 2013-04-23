@@ -1,9 +1,9 @@
 %% @author Mochi Media <dev@mochimedia.com>
 %% @copyright 2010 Mochi Media <dev@mochimedia.com>
 
-%% @doc greeting.
+%% @doc test.
 
--module(greeting).
+-module(test).
 -author("Mochi Media <dev@mochimedia.com>").
 -export([start/0, stop/0]).
 
@@ -17,14 +17,14 @@ ensure_started(App) ->
 
 
 %% @spec start() -> ok
-%% @doc Start the greeting server.
+%% @doc Start the test server.
 start() ->
-    greeting_deps:ensure(),
+    test_deps:ensure(),
     ensure_started(crypto),
-    application:start(greeting).
+    application:start(test).
 
 
 %% @spec stop() -> ok
-%% @doc Stop the greeting server.
+%% @doc Stop the test server.
 stop() ->
-    application:stop(greeting).
+    application:stop(test).

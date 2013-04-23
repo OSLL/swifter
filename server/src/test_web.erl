@@ -1,9 +1,9 @@
 %% @author Mochi Media <dev@mochimedia.com>
 %% @copyright 2010 Mochi Media <dev@mochimedia.com>
 
-%% @doc Web server for greeting.
+%% @doc Web server for test.
 
--module(greeting_web).
+-module(test_web).
 -author("Mochi Media <dev@mochimedia.com>").
 
 -export([start/1, stop/0, loop/2]).
@@ -27,10 +27,31 @@ loop(Req, DocRoot) ->
             Method when Method =:= 'GET'; Method =:= 'HEAD' ->
                 case Path of
 			"v1.0" ->
-                        Token = auth(Req),
-                        Req:respond({204, [{"X-Auth-Token", Token}], []});
+                       		Token = auth(Req),
+                        	Req:respond({204, [{"X-Auth-Token", Token}], []});
+			"v1.0/" ++ Rest ->
+				[Account, Container, Object] = string:tokens (Rest, "/"),
+				Auth_t = Req:get_header_value("X-Auth-Token"),
+				Sum = md5_hex(Account ++ Container ++ Object),
+				Req:ok({200, [{"ETag", Sum},{"X-Auth-Token", Auth_t}],
+                                     "Account: " ++ Account ++ "\n" ++
+					"Container:" ++ Container ++ "\n" ++
+					"Object:" ++ Object ++ "\n"});
                     _ ->
-                        Req:serve_file(Path, DocRoot)
+			Req:serve_file(Path, DocRoot)
+                end;
+	    'PUT' ->
+                case Path of
+			"v1.0/" ++ Rest ->
+				[Account, Container, Object] = string:tokens (Rest, "/"),
+				Auth_t = Req:get_header_value("X-Auth-Token"),
+				Sum = md5_hex(Account ++ Container ++ Object),
+				Req:respond({201, [{"ETag", Sum},{"X-Auth-Token", Auth_t}],
+                                     "Account: " ++ Account ++ "\n" ++
+					"Container:" ++ Container ++ "\n" ++
+					"Object:" ++ Object ++ "\n"});
+                    _ ->
+                        Req:not_found()
                 end;
             'POST' ->
                 case Path of
@@ -74,6 +95,8 @@ hex(N) when N < 10 ->
 hex(N) when N >= 10, N < 16 ->
 	$a + (N-10).
 
+%%
+%% Auth
 %%
 auth(Req) -> 
 	User = Req:get_header_value("X-Auth-User"),
