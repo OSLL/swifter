@@ -4,6 +4,7 @@
 %% @doc Web server for test.
 
 -module(test_web).
+
 -author("Mochi Media <dev@mochimedia.com>").
 
 -export([start/1, stop/0, loop/2]).
@@ -22,36 +23,63 @@ stop() ->
 
 loop(Req, DocRoot) ->
     "/" ++ Path = Req:get(path),
+    {ok, Pid} = riakc_pb_socket:start_link("127.0.0.1", 8087),
     try
         case Req:get(method) of
             Method when Method =:= 'GET'; Method =:= 'HEAD' ->
                 case Path of
 			"v1.0" ->
-                       		Token = auth(Req),
-                        	Req:respond({204, [{"X-Auth-Token", Token}], []});
+                    Token = auth(Req),
+                    Req:respond({204, [{"X-Auth-Token", Token}], []});
 			"v1.0/" ++ Rest ->
-				[Account, Container, Object] = string:tokens (Rest, "/"),
-				Auth_t = Req:get_header_value("X-Auth-Token"),
-				Sum = md5_hex(Account ++ Container ++ Object),
-				Req:ok({200, [{"ETag", Sum},{"X-Auth-Token", Auth_t}],
-                                     "Account: " ++ Account ++ "\n" ++
-					"Container:" ++ Container ++ "\n" ++
-					"Object:" ++ Object ++ "\n"});
-                    _ ->
-			Req:serve_file(Path, DocRoot)
+				try [_, _, _] = string:tokens (Rest, "/") of _->
+					[Account, Container, Object] = string:tokens (Rest, "/"),
+					Auth_t = Req:get_header_value("X-Auth-Token"),
+					Sum = md5_hex(Account ++ Container ++ Object),
+
+					{ok, Item} = riakc_pb_socket:get(Pid, list_to_binary(Account), list_to_binary(Container ++ "/" ++ Object)),
+					Obj = binary_to_term(riakc_obj:get_value(Item)),
+	               
+                    Req:ok({200, [{"ETag", Sum},{"X-Auth-Token", Auth_t}],
+                        Obj})
+				catch
+					_:_ ->
+					[Account, Container] = string:tokens (Rest, "/"),
+					Auth_t = Req:get_header_value("X-Auth-Token"),
+					Sum = md5_hex(Account ++ Container),
+					Req:ok({200, [{"ETag", Sum},{"X-Auth-Token", Auth_t}],
+		                "Account: " ++ Account ++ "\n" ++
+						"Container:" ++ Container ++ "\n"})
+				end;
+            _ ->
+                Req:serve_file(Path, DocRoot)
                 end;
-	    'PUT' ->
+            'PUT' ->
                 case Path of
 			"v1.0/" ++ Rest ->
-				[Account, Container, Object] = string:tokens (Rest, "/"),
-				Auth_t = Req:get_header_value("X-Auth-Token"),
-				Sum = md5_hex(Account ++ Container ++ Object),
-				Req:respond({201, [{"ETag", Sum},{"X-Auth-Token", Auth_t}],
-                                     "Account: " ++ Account ++ "\n" ++
-					"Container:" ++ Container ++ "\n" ++
-					"Object:" ++ Object ++ "\n"});
-                    _ ->
-                        Req:not_found()
+				try [_, _, _] = string:tokens (Rest, "/") of _->
+					[Account, Container, Object] = string:tokens (Rest, "/"),
+					Auth_t = Req:get_header_value("X-Auth-Token"),
+					Sum = md5_hex(Account ++ Container ++ Object),
+					
+					%%Upload
+					Data=Req:recv_body(),
+
+					Item = riakc_obj:new(list_to_binary(Account), list_to_binary(Container ++ "/" ++ Object), term_to_binary(Data)),
+					riakc_pb_socket:put(Pid, Item),
+					
+					Req:respond({201, [{"ETag", Sum},{"X-Auth-Token", Auth_t}],"Object:" ++ Object ++ "\n"})
+				catch
+					_:_ ->
+					[Account, Container] = string:tokens (Rest, "/"),
+					Auth_t = Req:get_header_value("X-Auth-Token"),
+					Sum = md5_hex(Account ++ Container),
+					Req:respond({201, [{"ETag", Sum},{"X-Auth-Token", Auth_t}],
+		                             "Account: " ++ Account ++ "\n" ++
+						"Container:" ++ Container ++ "\n"})
+				end;
+                _ ->
+                    Req:not_found()
                 end;
             'POST' ->
                 case Path of
@@ -116,3 +144,7 @@ you_should_write_a_test() ->
     ok.
 
 -endif.
+
+%%
+%% Upload
+%%
